@@ -2534,7 +2534,7 @@ const firebaseConfig = {
   measurementId: "G-Z7WX68GWWM"
 };
 
-const SYNC_PREFIXES = ['goals:', 'po_coach_', 'hx_', 'bjj_', 'finance_', 'run_log', 'streak_', 'race_prep_', 'gym_'];
+const SYNC_PREFIXES = ['goals:', 'goal_', 'po_coach_', 'hx_', 'bjj_', 'finance_', 'run_log', 'streak_', 'race_prep_', 'gym_'];
 let db, auth, user = null;
 let isSyncing = false;
 
@@ -2560,9 +2560,10 @@ function initFirebaseSync() {
         btn.classList.remove('loading', 'out');
         ind.classList.add('online');
         msg.textContent = `Logged in as ${user.displayName || user.email}`;
-        // Push local data to cloud first, then pull any remote data
-        await pushToCloud();
+        // Pull cloud data first (so we don't overwrite with empty local data)
         await pullFromCloud();
+        // Then push any local data that exists
+        await pushToCloud();
       } else {
         btn.textContent = 'Login to Sync';
         btn.classList.remove('loading');
@@ -2597,6 +2598,7 @@ async function pushToCloud() {
         payload[key] = localStorage.getItem(key);
       }
     }
+    if (Object.keys(payload).length === 0) { msg.textContent = 'Nothing to sync'; isSyncing = false; btn.textContent = originalText; ind.classList.remove('syncing'); return; }
     await db.collection('dashboards').doc(user.uid).set({
       data: payload,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
