@@ -2588,7 +2588,7 @@ async function pushToCloud() {
   const ind = document.getElementById('syncIndicator');
   const msg = document.getElementById('syncMsg');
   const originalText = btn.textContent;
-  btn.textContent = 'Syncing...';
+  btn.textContent = 'Pushing...';
   ind.classList.add('syncing');
   try {
     const payload = {};
@@ -2598,39 +2598,48 @@ async function pushToCloud() {
         payload[key] = localStorage.getItem(key);
       }
     }
-    if (Object.keys(payload).length === 0) { msg.textContent = 'Nothing to sync'; isSyncing = false; btn.textContent = originalText; ind.classList.remove('syncing'); return; }
+    const keyCount = Object.keys(payload).length;
+    if (keyCount === 0) {
+      msg.textContent = 'Nothing to push (0 keys)';
+      isSyncing = false; btn.textContent = originalText; ind.classList.remove('syncing');
+      return;
+    }
     await db.collection('dashboards').doc(user.uid).set({
       data: payload,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       deviceName: navigator.userAgent.includes('Mobile') ? 'Phone' : 'Laptop'
-    }, { merge: true });
-    msg.textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
-  } catch (e) { console.error("Push Error:", e); msg.textContent = "Sync failed: " + e.message; }
+    });
+    msg.textContent = `Pushed ${keyCount} keys (${new Date().toLocaleTimeString()})`;
+  } catch (e) { console.error("Push Error:", e); msg.textContent = "Push failed: " + e.message; }
   finally { isSyncing = false; btn.textContent = originalText; ind.classList.remove('syncing'); }
 }
 
 async function pullFromCloud() {
   if (!user) return;
+  const msg = document.getElementById('syncMsg');
   try {
     const snap = await db.collection('dashboards').doc(user.uid).get();
-    if (snap.exists && snap.data().data) {
-      const remoteData = snap.data().data;
-      let changed = false;
-      Object.keys(remoteData).forEach(key => {
-        const localVal = localStorage.getItem(key);
-        if (localVal !== remoteData[key]) {
-          localStorage.setItem(key, remoteData[key]);
-          changed = true;
-        }
-      });
-      if (changed) {
-        document.getElementById('syncMsg').textContent = 'Synced from cloud — reloading...';
-        setTimeout(() => location.reload(), 500);
-      } else {
-        document.getElementById('syncMsg').textContent = `Up to date (${new Date().toLocaleTimeString()})`;
-      }
+    if (!snap.exists || !snap.data().data) {
+      msg.textContent = 'Cloud is empty — push first from your main device';
+      return;
     }
-  } catch (e) { console.error("Pull Error:", e); }
+    const remoteData = snap.data().data;
+    const remoteKeys = Object.keys(remoteData);
+    let changed = 0;
+    remoteKeys.forEach(key => {
+      const localVal = localStorage.getItem(key);
+      if (localVal !== remoteData[key]) {
+        localStorage.setItem(key, remoteData[key]);
+        changed++;
+      }
+    });
+    if (changed > 0) {
+      msg.textContent = `Pulled ${changed}/${remoteKeys.length} keys — reloading...`;
+      setTimeout(() => location.reload(), 800);
+    } else {
+      msg.textContent = `Up to date (${remoteKeys.length} keys, ${new Date().toLocaleTimeString()})`;
+    }
+  } catch (e) { console.error("Pull Error:", e); msg.textContent = "Pull failed: " + e.message; }
 }
 
 // Tab Switching & Initialization
