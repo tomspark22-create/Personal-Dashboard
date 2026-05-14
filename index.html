@@ -2572,7 +2572,7 @@ function initFirebaseSync() {
     btn.onclick = async () => {
       if (!user) {
         try { await auth.signInWithPopup(provider); } 
-        catch (e) { alert("Login failed. Use a local server like 'npx serve' if on file://"); }
+        catch (e) { console.error("Auth Error:", e); alert("Login failed: " + e.message); }
       } else { await pushToCloud(); }
     };
   } catch (e) { console.error("Firebase Init Error:", e); btn.textContent = 'Init Error'; }
